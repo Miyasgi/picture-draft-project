@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picture Style Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .upload-container {
+            text-align: center;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .images-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .image-box {
+            margin: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .image-box img {
+            max-width: 100%;
+            max-height: 400px;
+            display: block;
+        }
+        .image-box h3 {
+            text-align: center;
+            margin: 10px 0;
+        }
+        #uploadForm {
+            margin: 20px 0;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin: 10px 0;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group label {
+            min-width: 120px;
+        }
+        .control-group input[type="range"] {
+            flex: 1;
+        }
+        .control-group span {
+            min-width: 30px;
+            text-align: right;
+        }
+        .file-input {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <h1>Picture Style Generator</h1>
+        <form id="uploadForm">
+            <div class="file-input">
+                <input type="file" id="imageInput" accept="image/*" required>
+                <button type="submit">Upload Image</button>
+            </div>
+        </form>
+        <div id="controls" class="controls" style="display: none;">
+            <div class="control-group">
+                <label for="pencilBlur">Pencil Sketch Blur:</label>
+                <input type="range" id="pencilBlur" name="pencilBlur" min="1" max="51" step="2" value="21">
+                <span id="pencilBlurValue">21</span>
+            </div>
+            <div class="control-group">
+                <label for="mangaBlur">Manga Style Blur:</label>
+                <input type="range" id="mangaBlur" name="mangaBlur" min="3" max="25" step="2" value="9">
+                <span id="mangaBlurValue">9</span>
+            </div>
+        </div>
+        <div class="loading" id="loading">Processing image...</div>
+    </div>
+    
+    <div class="images-container" id="imagesContainer"></div>
+
+    <script>
+        let currentImageFile = null;
+        let processingTimeout = null;
+        const PROCESSING_DELAY = 300; // ms delay for debouncing
+
+        async function processImage() {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('imagesContainer');
+            const pencilBlur = document.getElementById('pencilBlur');
+            const mangaBlur = document.getElementById('mangaBlur');
+
+            if (!currentImageFile) {
+                return;
+            }
+
+            loading.style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('file', currentImageFile);
+            formData.append('pencilBlur', pencilBlur.value);
+            formData.append('mangaBlur', mangaBlur.value);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+
+                // Add timestamp to prevent browser caching
+                const timestamp = new Date().getTime();
+                container.innerHTML = `
+                    <div class="image-box">
+                        <h3>Original</h3>
+                        <img src="/static/uploads/${data.original}?t=${timestamp}" alt="Original">
+                    </div>
+                    <div class="image-box">
+                        <h3>Pencil Sketch</h3>
+                        <img src="/static/processed/${data.sketch}?t=${timestamp}" alt="Pencil Sketch">
+                    </div>
+                    <div class="image-box">
+                        <h3>Manga Style</h3>
+                        <img src="/static/processed/${data.manga}?t=${timestamp}" alt="Manga Style">
+                    </div>
+                `;
+            } catch (error) {
+                alert('Error processing image: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Debounced slider update
+        function debouncedProcess() {
+            if (processingTimeout) {
+                clearTimeout(processingTimeout);
+            }
+            processingTimeout = setTimeout(processImage, PROCESSING_DELAY);
+        }
+
+        // Update slider value displays and trigger processing
+        document.getElementById('pencilBlur').addEventListener('input', (e) => {
+            document.getElementById('pencilBlurValue').textContent = e.target.value;
+            debouncedProcess();
+        });
+
+        document.getElementById('mangaBlur').addEventListener('input', (e) => {
+            document.getElementById('mangaBlurValue').textContent = e.target.value;
+            debouncedProcess();
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('imageInput');
+            const controls = document.getElementById('controls');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select an image first');
+                return;
+            }
+
+            currentImageFile = fileInput.files[0];
+            controls.style.display = 'block';
+            await processImage();
+
+            loading.style.display = 'block';
+            container.innerHTML = '';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+                const timestamp = new Date().getTime();
+                
+                // Display images
+                container.innerHTML = `
+                    <div class="image-box">
+                        <h3>Original</h3>
+                        <img src="/static/uploads/${data.original}?t=${timestamp}" alt="Original">
+                    </div>
+                    <div class="image-box">
+                        <h3>Pencil Sketch</h3>
+                        <img src="/static/processed/${data.sketch}?t=${timestamp}" alt="Pencil Sketch">
+                    </div>
+                    <div class="image-box">
+                        <h3>Manga Style</h3>
+                        <img src="/static/processed/${data.manga}?t=${timestamp}" alt="Manga Style">
+                    </div>
+                `;
+            } catch (error) {
+                alert('Error processing image: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
