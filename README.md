@@ -19,6 +19,8 @@ A web application that transforms images into pencil sketches and manga-style ar
 
 ## Installation
 
+### Local Development
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/Miyasgi/picture-draft-project.git
@@ -38,6 +40,55 @@ python app.py
 ```
 
 4. Open your browser and visit `http://localhost:5000`
+
+### Docker Deployment
+
+1. Clone the repository and navigate to it:
+```bash
+git clone https://github.com/Miyasgi/picture-draft-project.git
+cd picture-draft-project
+```
+
+2. Build and run with Docker Compose:
+```bash
+docker-compose up -d --build
+```
+
+3. Access the application at `http://localhost:5000`
+
+To stop the application:
+```bash
+docker-compose down
+```
+
+### Cloud Deployment
+
+#### Prerequisites
+- Docker installed on your cloud server
+- Git installed on your cloud server
+- Open port 5000 in your cloud server's firewall/security group
+
+#### Deployment Steps
+
+1. SSH into your cloud server:
+```bash
+ssh username@your-server-ip
+```
+
+2. Clone and deploy the application:
+```bash
+git clone https://github.com/Miyasgi/picture-draft-project.git
+cd picture-draft-project
+docker-compose up -d --build
+```
+
+3. Access the application at `http://your-server-ip:5000`
+
+For production deployment, it's recommended to:
+- Set up a domain name
+- Configure SSL/TLS with Let's Encrypt
+- Use a reverse proxy (like Nginx)
+- Set up proper monitoring and logging
 
 ## Usage
 
