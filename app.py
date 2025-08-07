@@ -13,7 +13,7 @@ app.config['PROCESSED_FOLDER'] = 'static/processed'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
 
-def pencil_sketch(image_path, blur_value=21):
+def pencil_sketch(image_path, blur_value=21, canny_threshold=50):
     # Ensure blur value is odd
     blur_value = int(blur_value)
     if blur_value % 2 == 0:
@@ -21,63 +21,58 @@ def pencil_sketch(image_path, blur_value=21):
 
     # Read image
     img = cv2.imread(image_path)
-    # Convert to RGB for better color processing
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # Convert to grayscale
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-    
+
     # Create the negative invert
     inv = 255 - gray
     # Apply Gaussian blur with custom kernel size
     blurred = cv2.GaussianBlur(inv, (blur_value, blur_value), 0)
     # Invert the blurred image
     inv_blurred = 255 - blurred
-    
+
     # Create pencil sketch
     sketch = cv2.divide(gray, inv_blurred, scale=256.0)
-    
+
+
+
     # Enhance the sketch
     sketch = cv2.normalize(sketch, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-    sketch = cv2.GaussianBlur(sketch, (3, 3), 0)
-    sketch = cv2.addWeighted(sketch, 1.5, sketch, -0.5, 0)
-    
+
+    # Apply sharpening kernel for a crisper effect
+    kernel = np.array([[0, -1, 0],
+                      [-1, 5, -1],
+                      [0, -1, 0]])
+    sketch = cv2.filter2D(sketch, -1, kernel)
+
     return sketch
 
-def manga_style(image_path, blur_value=9):
-    # Ensure blur value is odd
+def pen_draw_style(image_path, blur_value=9, canny_threshold=20):
+    # Ensure blur value is odd and at least 1
     blur_value = int(blur_value)
+    if blur_value < 1:
+        blur_value = 1
     if blur_value % 2 == 0:
         blur_value += 1
 
     # Read image
     img = cv2.imread(image_path)
-    # Convert to RGB
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # Convert to grayscale
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-    
-    # Apply bilateral filter for edge preservation and noise reduction
-    bilateral = cv2.bilateralFilter(gray, blur_value, 75, 75)
-    
-    # Create edge mask
-    edges = cv2.Canny(bilateral, 100, 200)
-    
-    # Enhance contrast
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    enhanced = clahe.apply(bilateral)
-    
-    # Apply adaptive thresholding
-    manga = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-                                cv2.THRESH_BINARY, 11, 2)
-    
-    # Combine edges with manga style
-    manga = cv2.addWeighted(manga, 0.7, edges, 0.3, 0)
-    
-    # Clean up noise
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
-    manga = cv2.morphologyEx(manga, cv2.MORPH_CLOSE, kernel)
-    
-    return manga
+
+    # Use a small Gaussian blur to reduce noise but keep fine details
+    blurred = cv2.GaussianBlur(gray, (blur_value, blur_value), 0)
+
+    # Fine, sharp edge detection (like a fine pen)
+    pen_edges = cv2.Canny(blurred, canny_threshold, canny_threshold * 4, apertureSize=3, L2gradient=True)
+
+    # Invert for black lines on white
+    pen_img = 255 - pen_edges
+
+    # Optional: Slightly enhance contrast for a crisp ink look
+    pen_img = cv2.normalize(pen_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+
+    return pen_img
 
 @app.route('/')
 def index():
@@ -97,25 +92,27 @@ def upload_file():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
 
-    # Get blur values from form
+    # Get blur and canny values from form
     pencil_blur = request.form.get('pencilBlur', '21')
-    manga_blur = request.form.get('mangaBlur', '9')
+    pen_blur = request.form.get('mangaBlur', '9')
+    # pencil_canny is ignored for pencil_sketch
+    pen_canny = int(request.form.get('penCanny', '20'))
 
-    # Generate both styles with custom blur values
+    # Generate both styles with custom blur and canny values
     sketch_img = pencil_sketch(filepath, pencil_blur)
-    manga_img = manga_style(filepath, manga_blur)
+    pen_img = pen_draw_style(filepath, pen_blur, pen_canny)
 
     # Save processed images
     sketch_filename = f'sketch_{filename}'
-    manga_filename = f'manga_{filename}'
+    pen_filename = f'pen_{filename}'
     
     cv2.imwrite(os.path.join(app.config['PROCESSED_FOLDER'], sketch_filename), sketch_img)
-    cv2.imwrite(os.path.join(app.config['PROCESSED_FOLDER'], manga_filename), manga_img)
+    cv2.imwrite(os.path.join(app.config['PROCESSED_FOLDER'], pen_filename), pen_img)
 
     return {
         'original': filename,
         'sketch': sketch_filename,
-        'manga': manga_filename
+        'pen': pen_filename
     }
 
 if __name__ == '__main__':

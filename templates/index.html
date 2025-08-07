@@ -89,10 +89,14 @@
                 <span id="pencilBlurValue">21</span>
             </div>
             <div class="control-group">
-                <label for="mangaBlur">Manga Style Blur:</label>
-                <input type="range" id="mangaBlur" name="mangaBlur" min="3" max="25" step="2" value="9">
-                <span id="mangaBlurValue">9</span>
+                <label for="penBlur">Pen Style Blur:</label>
+                <input type="range" id="penBlur" name="penBlur" min="1" max="25" step="2" value="1">
+                <span id="penBlurValue">1</span>
             </div>
+            <div class="control-group">
+                <label for="penCanny">Pen Canny Threshold:</label>
+                <input type="range" id="penCanny" name="penCanny" min="1" max="255" step="1" value="20">
+                <span id="penCannyValue">20</span>
         </div>
         <div class="loading" id="loading">Processing image...</div>
     </div>
@@ -108,7 +112,7 @@
             const loading = document.getElementById('loading');
             const container = document.getElementById('imagesContainer');
             const pencilBlur = document.getElementById('pencilBlur');
-            const mangaBlur = document.getElementById('mangaBlur');
+            const penBlur = document.getElementById('penBlur');
 
             if (!currentImageFile) {
                 return;
@@ -119,7 +123,7 @@
             const formData = new FormData();
             formData.append('file', currentImageFile);
             formData.append('pencilBlur', pencilBlur.value);
-            formData.append('mangaBlur', mangaBlur.value);
+            formData.append('mangaBlur', penBlur.value);
 
             try {
                 const response = await fetch('/upload', {
@@ -145,8 +149,8 @@
                         <img src="/static/processed/${data.sketch}?t=${timestamp}" alt="Pencil Sketch">
                     </div>
                     <div class="image-box">
-                        <h3>Manga Style</h3>
-                        <img src="/static/processed/${data.manga}?t=${timestamp}" alt="Manga Style">
+                        <h3>Pen Style</h3>
+                        <img src="/static/processed/${data.pen}?t=${timestamp}" alt="Pen Style">
                     </div>
                 `;
             } catch (error) {
@@ -170,8 +174,12 @@
             debouncedProcess();
         });
 
-        document.getElementById('mangaBlur').addEventListener('input', (e) => {
-            document.getElementById('mangaBlurValue').textContent = e.target.value;
+        document.getElementById('penBlur').addEventListener('input', (e) => {
+            document.getElementById('penBlurValue').textContent = e.target.value;
+            debouncedProcess();
+        });
+        document.getElementById('penCanny').addEventListener('input', (e) => {
+            document.getElementById('penCannyValue').textContent = e.target.value;
             debouncedProcess();
         });
 
